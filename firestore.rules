@@ -1,0 +1,47 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function isValidTask(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
+             data.userId == request.auth.uid &&
+             data.startDate is string &&
+             data.duration is number && data.duration > 0 &&
+             data.completions is map &&
+             (!('isArchived' in data) || data.isArchived is bool) &&
+             (!('reminderType' in data) || data.reminderType in ['none', 'browser', 'email', 'both']);
+    }
+
+    function isValidUserSettings(data) {
+      return (data.theme == 'light' || data.theme == 'dark') &&
+             data.categories is list &&
+             (!('notificationsEnabled' in data) || data.notificationsEnabled is bool) &&
+             (!('emailRemindersEnabled' in data) || data.emailRemindersEnabled is bool);
+    }
+
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isValidTask(request.resource.data);
+      allow update: if isAuthenticated() && isDocOwner() && isValidTask(request.resource.data);
+      allow delete: if isAuthenticated() && isDocOwner();
+    }
+
+    match /userSettings/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && isValidUserSettings(request.resource.data);
+    }
+  }
+}

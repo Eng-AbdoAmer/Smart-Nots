@@ -1,0 +1,43 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "A daily task with tracking",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the task" },
+        "description": { "type": "string", "description": "Optional description" },
+        "startDate": { "type": "string", "format": "date", "description": "Start date in YYYY-MM-DD" },
+        "duration": { "type": "integer", "description": "Number of days" },
+        "category": { "type": "string", "description": "Category ID or name" },
+        "completions": { "type": "object", "description": "Map of dateKey to boolean" },
+        "userId": { "type": "string", "description": "Owner UID" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isArchived": { "type": "boolean", "description": "Whether the task is archived" },
+        "reminderType": { "type": "string", "enum": ["none", "browser", "email", "both"], "description": "Type of reminder for this task" }
+      },
+      "required": ["name", "startDate", "duration", "userId"]
+    },
+    "UserSettings": {
+      "title": "User Settings",
+      "description": "User preferences and custom categories",
+      "type": "object",
+      "properties": {
+        "theme": { "type": "string", "enum": ["light", "dark"] },
+        "categories": { "type": "array", "items": { "type": "object" } },
+        "notificationsEnabled": { "type": "boolean" },
+        "emailRemindersEnabled": { "type": "boolean" }
+      }
+    }
+  },
+  "firestore": {
+    "tasks": {
+      "schema": "Task",
+      "description": "Collection of user tasks"
+    },
+    "userSettings": {
+      "schema": "UserSettings",
+      "description": "User specific settings"
+    }
+  }
+}
