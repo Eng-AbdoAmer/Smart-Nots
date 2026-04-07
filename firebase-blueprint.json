@@ -26,8 +26,28 @@
         "theme": { "type": "string", "enum": ["light", "dark"] },
         "categories": { "type": "array", "items": { "type": "object" } },
         "notificationsEnabled": { "type": "boolean" },
-        "emailRemindersEnabled": { "type": "boolean" }
+        "emailRemindersEnabled": { "type": "boolean" },
+        "displayName": { "type": "string" },
+        "bio": { "type": "string" },
+        "dailyGoal": { "type": "integer" },
+        "joinedAt": { "type": "string", "format": "date-time" },
+        "streak": { "type": "integer" },
+        "totalCompletions": { "type": "integer" },
+        "achievements": { "type": "array", "items": { "type": "string" } },
+        "lastCompletionDate": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] }
       }
+    },
+    "Category": {
+      "title": "Category",
+      "description": "A task category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "color": { "type": "string" }
+      },
+      "required": ["id", "name", "color"]
     }
   },
   "firestore": {
@@ -38,6 +58,10 @@
     "userSettings": {
       "schema": "UserSettings",
       "description": "User specific settings"
+    },
+    "categories": {
+      "schema": "Category",
+      "description": "Global categories managed by admin"
     }
   }
 }

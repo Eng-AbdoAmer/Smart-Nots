@@ -23,6 +23,15 @@ export interface UserSettings {
   categories: Category[];
   notificationsEnabled: boolean;
   emailRemindersEnabled: boolean;
+  displayName?: string;
+  bio?: string;
+  dailyGoal?: number;
+  joinedAt?: string;
+  streak?: number;
+  totalCompletions?: number;
+  achievements?: string[];
+  lastCompletionDate?: string;
+  role?: 'admin' | 'user';
 }
 
 export const DEFAULT_CATEGORIES: Category[] = [

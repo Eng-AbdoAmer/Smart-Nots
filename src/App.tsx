@@ -15,6 +15,7 @@ import {
   doc, 
   setDoc,
   getDoc,
+  getDocs,
   orderBy,
   serverTimestamp,
   getDocFromServer
@@ -31,6 +32,8 @@ import {
 } from './firebase';
 import { Task, Category, DEFAULT_CATEGORIES, UserSettings } from './types';
 import { cn } from './lib/utils';
+import Profile from './components/Profile';
+import AdminDashboard from './components/AdminDashboard';
 import { 
   Plus, 
   Trash2, 
@@ -62,7 +65,15 @@ import {
   Mail,
   MailCheck,
   MailWarning,
-  MessageSquare
+  MessageSquare,
+  Circle,
+  User as UserIcon,
+  Award,
+  Zap,
+  Target,
+  ShieldAlert,
+  RefreshCw,
+  Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -168,7 +179,9 @@ export default function App() {
   const [showStats, setShowStats] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [viewArchived, setViewArchived] = useState(false);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'profile' | 'admin'>('dashboard');
   const [emailStatus, setEmailStatus] = useState<{ emailConfigured: boolean } | null>(null);
+  const [globalCategories, setGlobalCategories] = useState<Category[]>([]);
   
   // Auth UI State
   const [authMode, setAuthMode] = useState<'login' | 'signup' | 'reset'>('login');
@@ -196,7 +209,7 @@ export default function App() {
 
   // --- Firebase Auth & Connection Test ---
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       setIsAuthReady(true);
       
@@ -212,14 +225,25 @@ export default function App() {
             setSettings({ 
               ...data, 
               notificationsEnabled: data.notificationsEnabled ?? false,
-              emailRemindersEnabled: data.emailRemindersEnabled ?? false
+              emailRemindersEnabled: data.emailRemindersEnabled ?? false,
+              streak: data.streak ?? 0,
+              totalCompletions: data.totalCompletions ?? 0,
+              achievements: data.achievements ?? [],
+              joinedAt: data.joinedAt ?? new Date().toISOString()
             } as UserSettings);
           } else {
             const initialSettings: UserSettings = { 
               theme: 'light', 
               categories: DEFAULT_CATEGORIES, 
               notificationsEnabled: false,
-              emailRemindersEnabled: false
+              emailRemindersEnabled: false,
+              displayName: u.displayName || '',
+              joinedAt: new Date().toISOString(),
+              streak: 0,
+              totalCompletions: 0,
+              achievements: [],
+              dailyGoal: 3,
+              role: u.email === 'abdoamer067@gmail.com' ? 'admin' : 'user'
             };
             await setDoc(doc(db, 'userSettings', u.uid), initialSettings);
             setSettings(initialSettings);
@@ -230,8 +254,25 @@ export default function App() {
       }
       setIsLoading(false);
     });
-    return () => unsubscribe();
+
+    const unsubscribeCats = onSnapshot(collection(db, 'categories'), (snapshot) => {
+      const cats = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Category));
+      setGlobalCategories(cats);
+    });
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeCats();
+    };
   }, []);
+
+  useEffect(() => {
+    if (user && settings && user.email === 'abdoamer067@gmail.com' && settings.role !== 'admin') {
+      const updatedSettings = { ...settings, role: 'admin' as const };
+      setSettings(updatedSettings);
+      updateDoc(doc(db, 'userSettings', user.uid), { role: 'admin' });
+    }
+  }, [user, settings]);
 
   // --- Notification Logic ---
   const requestNotificationPermission = async () => {
@@ -473,9 +514,21 @@ export default function App() {
     setTimeout(() => setToast(prev => ({ ...prev, visible: false })), 4000);
   };
 
+  const onUpdateSettings = async (newSettings: Partial<UserSettings>) => {
+    if (!user) return;
+    const updated = { ...settings, ...newSettings };
+    setSettings(updated);
+    try {
+      await updateDoc(doc(db, 'userSettings', user.uid), newSettings);
+    } catch (error) {
+      showToast('فشل تحديث الإعدادات.', 'error');
+    }
+  };
+
   const toggleCompletion = async (task: Task, dateKey: string) => {
     if (!user) return;
-    const newCompletions = { ...task.completions, [dateKey]: !task.completions[dateKey] };
+    const isCompleting = !task.completions[dateKey];
+    const newCompletions = { ...task.completions, [dateKey]: isCompleting };
     
     // Check if fully completed
     const wasFull = Object.values(task.completions).every(v => v);
@@ -483,6 +536,33 @@ export default function App() {
 
     try {
       await updateDoc(doc(db, 'tasks', task.id), { completions: newCompletions });
+      
+      // Update total completions and streak
+      if (isCompleting) {
+        const newTotal = (settings.totalCompletions || 0) + 1;
+        const today = getDateKey(new Date());
+        
+        // Simple streak logic: if first completion of the day
+        let newStreak = settings.streak || 0;
+        const lastCompletionDate = settings.lastCompletionDate;
+        
+        if (lastCompletionDate !== today) {
+          const yesterday = getDateKey(new Date(Date.now() - 86400000));
+          if (lastCompletionDate === yesterday) {
+            newStreak += 1;
+          } else {
+            newStreak = 1;
+          }
+          await onUpdateSettings({ 
+            totalCompletions: newTotal, 
+            streak: newStreak,
+            lastCompletionDate: today 
+          });
+        } else {
+          await onUpdateSettings({ totalCompletions: newTotal });
+        }
+      }
+
       if (isFull && !wasFull) {
         showToast(`🥳 مبروك! لقد أكملت "${task.name}" بالكامل 🎉`);
       }
@@ -556,6 +636,10 @@ export default function App() {
   };
 
   // --- Filtering & Stats ---
+  const mergedCategories = useMemo(() => {
+    return globalCategories.length > 0 ? globalCategories : settings.categories;
+  }, [globalCategories, settings.categories]);
+
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
       const matchesSearch = t.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -740,6 +824,30 @@ export default function App() {
             </div>
 
             <div className="flex items-center gap-2 sm:gap-4">
+              {settings.role === 'admin' && (
+                <button 
+                  onClick={() => setCurrentView(currentView === 'admin' ? 'dashboard' : 'admin')}
+                  className={cn(
+                    "p-2.5 rounded-xl transition-colors flex items-center gap-2",
+                    currentView === 'admin' ? "bg-red-600 text-white shadow-lg shadow-red-200 dark:shadow-none" : "hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600"
+                  )}
+                  title="لوحة تحكم المدير"
+                >
+                  <ShieldAlert className="w-5 h-5" />
+                  <span className="hidden md:block font-bold">المدير</span>
+                </button>
+              )}
+              <button 
+                onClick={() => setCurrentView(currentView === 'dashboard' ? 'profile' : 'dashboard')}
+                className={cn(
+                  "p-2.5 rounded-xl transition-colors flex items-center gap-2",
+                  currentView === 'profile' ? "bg-indigo-600 text-white" : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                )}
+                title="الملف الشخصي"
+              >
+                <UserIcon className="w-5 h-5" />
+                <span className="hidden md:block font-bold">الملف الشخصي</span>
+              </button>
               <button 
                 onClick={() => setShowStats(!showStats)}
                 className="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
@@ -781,9 +889,17 @@ export default function App() {
         </header>
 
         <main className="max-w-7xl mx-auto px-4 py-8">
-          {/* Dashboard Stats */}
-          <AnimatePresence>
-            {showStats && (
+          <AnimatePresence mode="wait">
+            {currentView === 'dashboard' ? (
+              <motion.div
+                key="dashboard"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+              >
+                {/* Dashboard Stats */}
+                <AnimatePresence>
+                  {showStats && (
               <motion.div 
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: 'auto', opacity: 1 }}
@@ -902,7 +1018,7 @@ export default function App() {
                 className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-6 py-4 rounded-3xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold shadow-sm"
               >
                 <option value="all">كل التصنيفات</option>
-                {settings.categories.map(c => (
+                {mergedCategories.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
@@ -936,7 +1052,7 @@ export default function App() {
                   <TaskCard 
                     key={task.id} 
                     task={task} 
-                    categories={settings.categories}
+                    categories={mergedCategories}
                     onToggle={(dateKey) => toggleCompletion(task, dateKey)}
                     onDelete={() => handleDeleteTask(task.id)}
                     onEdit={() => setEditingTask(task)}
@@ -963,7 +1079,25 @@ export default function App() {
               <input type="file" accept=".json" onChange={importData} className="hidden" />
             </label>
           </div>
-        </main>
+        </motion.div>
+      ) : currentView === 'profile' ? (
+        <Profile 
+          key="profile"
+          user={user}
+          settings={settings}
+          tasks={tasks}
+          onUpdateSettings={onUpdateSettings}
+          onBack={() => setCurrentView('dashboard')}
+          onLogout={logout}
+        />
+      ) : (
+        <AdminDashboard 
+          key="admin"
+          onBack={() => setCurrentView('dashboard')}
+        />
+      )}
+    </AnimatePresence>
+  </main>
 
         {/* Settings Modal */}
         <AnimatePresence>
@@ -1088,6 +1222,36 @@ export default function App() {
                       <ChevronLeft className="w-5 h-5 text-slate-400" />
                     </button>
                   </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider">التصنيفات</h3>
+                      {globalCategories.length > 0 && (
+                        <button 
+                          onClick={async () => {
+                            if (confirm('هل تريد استبدال تصنيفاتك بالتصنيفات العالمية المحددة من قبل المدير؟')) {
+                              const newSettings = { ...settings, categories: globalCategories };
+                              await updateDoc(doc(db, 'userSettings', user!.uid), { categories: globalCategories });
+                              setSettings(newSettings);
+                              showToast('تم تحديث التصنيفات بنجاح', 'success');
+                            }
+                          }}
+                          className="text-[10px] text-indigo-600 font-bold hover:underline flex items-center gap-1"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                          مزامنة مع التصنيفات العالمية
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {mergedCategories.map(cat => (
+                        <div key={cat.id} className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800 rounded-2xl">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                          <span className="text-xs font-bold">{cat.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </motion.div>
             </div>
@@ -1161,7 +1325,7 @@ export default function App() {
                         onChange={(e) => setNewTaskCategory(e.target.value)}
                         className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 font-bold"
                       >
-                        {settings.categories.map(c => (
+                        {mergedCategories.map(c => (
                           <option key={c.id} value={c.id}>{c.name}</option>
                         ))}
                       </select>
@@ -1235,7 +1399,7 @@ export default function App() {
                       onChange={(e) => setEditingTask({ ...editingTask, category: e.target.value })}
                       className="w-full px-6 py-4 bg-slate-50 dark:bg-slate-800 border-none rounded-2xl focus:ring-2 focus:ring-indigo-500 font-bold"
                     >
-                      {settings.categories.map(c => (
+                      {mergedCategories.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>

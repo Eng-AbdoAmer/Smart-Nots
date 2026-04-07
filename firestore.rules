@@ -15,6 +15,19 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == resource.data.userId;
     }
 
+    function isAdmin() {
+      return isAuthenticated() && 
+        (request.auth.token.email == "abdoamer067@gmail.com" || 
+         (exists(/databases/$(database)/documents/userSettings/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/userSettings/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function isValidCategory(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 50 &&
+             data.color is string && data.color.matches("^#[0-9a-fA-F]{6}$") &&
+             data.id is string;
+    }
+
     function isValidTask(data) {
       return data.name is string && data.name.size() > 0 && data.name.size() < 200 &&
              data.userId == request.auth.uid &&
@@ -29,19 +42,33 @@ service cloud.firestore {
       return (data.theme == 'light' || data.theme == 'dark') &&
              data.categories is list &&
              (!('notificationsEnabled' in data) || data.notificationsEnabled is bool) &&
-             (!('emailRemindersEnabled' in data) || data.emailRemindersEnabled is bool);
+             (!('emailRemindersEnabled' in data) || data.emailRemindersEnabled is bool) &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() < 100)) &&
+             (!('bio' in data) || (data.bio is string && data.bio.size() < 500)) &&
+             (!('dailyGoal' in data) || (data.dailyGoal is number && data.dailyGoal >= 0)) &&
+             (!('streak' in data) || (data.streak is number && data.streak >= 0)) &&
+             (!('totalCompletions' in data) || (data.totalCompletions is number && data.totalCompletions >= 0)) &&
+             (!('achievements' in data) || data.achievements is list) &&
+             (!('lastCompletionDate' in data) || data.lastCompletionDate is string) &&
+             (!('role' in data) || data.role in ['admin', 'user']);
     }
 
     match /tasks/{taskId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid);
+      allow read: if isAuthenticated() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       allow create: if isAuthenticated() && isValidTask(request.resource.data);
-      allow update: if isAuthenticated() && isDocOwner() && isValidTask(request.resource.data);
-      allow delete: if isAuthenticated() && isDocOwner();
+      allow update: if isAuthenticated() && (isDocOwner() || isAdmin()) && isValidTask(request.resource.data);
+      allow delete: if isAuthenticated() && (isDocOwner() || isAdmin());
     }
 
     match /userSettings/{userId} {
-      allow read: if isOwner(userId);
-      allow write: if isOwner(userId) && isValidUserSettings(request.resource.data);
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isValidUserSettings(request.resource.data) && 
+                   (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidCategory(request.resource.data);
     }
   }
 }
