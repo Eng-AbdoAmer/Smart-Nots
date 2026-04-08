@@ -1,20 +1,57 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Smart_Notes - تطبيق إدارة المهام الذكي
 
-# Run and deploy your AI Studio app
+تطبيق متقدم لإدارة المهام اليومية يهدف إلى مساعدة المستخدمين على تتبع إنتاجيتهم وبناء عادات إيجابية من خلال واجهة مستخدم عصرية وسهلة الاستخدام.
 
-This contains everything you need to run your app locally.
+## 🚀 المميزات الرئيسية
 
-View your app in AI Studio: https://ai.studio/apps/1d1ed4e2-3aba-440a-9ac6-68bf55490431
+- **إدارة المهام:** إضافة، تعديل، حذف، وأرشفة المهام بسهولة.
+- **التتبع اليومي:** نظام تتبع بصري للمهام اليومية يسمح للمستخدمين بتحديد إنجازاتهم لكل يوم.
+- **إحصائيات متقدمة:** رسوم بيانية تفاعلية (باستخدام Recharts) توضح توزيع المهام حسب التصنيفات ونسب الإنجاز.
+- **نظام التصنيفات الملونة:** إمكانية تنظيم المهام تحت تصنيفات مخصصة بألوان مختلفة لسهولة التمييز.
+- **لوحة تحكم المدير (Admin Dashboard):** واجهة خاصة للمديرين لإدارة التصنيفات العالمية ومراقبة أداء النظام.
+- **الملف الشخصي:** تتبع الإنجازات، الأوسمة، وسلاسل الإنجاز (Streaks).
+- **التنبيهات:** دعم التنبيهات عبر المتصفح والبريد الإلكتروني لضمان عدم نسيان المهام.
+- **الوضع الليلي (Dark Mode):** واجهة مريحة للعين تدعم الوضعين الفاتح والمظلم.
+- **تكامل Firebase:** مزامنة لحظية للبيانات وتأمينها باستخدام Firebase Firestore و Authentication.
 
-## Run Locally
+## 🛠 التقنيات المستخدمة
 
-**Prerequisites:**  Node.js
+- **Frontend:** React 19, TypeScript, Vite.
+- **Styling:** Tailwind CSS 4.
+- **Database & Auth:** Firebase (Firestore & Google Auth).
+- **Animations:** Motion (Framer Motion).
+- **Charts:** Recharts.
+- **Backend (Optional):** Express (لإرسال التنبيهات والبريد الإلكتروني).
+- **Icons:** Lucide React.
 
+## 📁 هيكل المشروع
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- `src/App.tsx`: المكون الرئيسي للتطبيق ومنطق العمل.
+- `src/components/`: يحتوي على المكونات القابلة لإعادة الاستخدام (AdminDashboard, Profile, TaskCard).
+- `src/firebase.ts`: إعدادات واتصال Firebase.
+- `firestore.rules`: قواعد الأمان الخاصة بقاعدة البيانات.
+- `server.ts`: خادم Express للخدمات الخلفية.
+
+## ⚙️ التشغيل المحلي
+
+1. قم بتثبيت التبعيات:
+   ```bash
+   npm install
+   ```
+
+2. قم بتشغيل خادم التطوير:
+   ```bash
+   npm run dev
+   ```
+
+3. قم ببناء المشروع للإنتاج:
+   ```bash
+   npm run build
+   ```
+
+## 🔒 الأمان
+
+يعتمد التطبيق على قواعد أمان صارمة في Firestore تضمن أن كل مستخدم يمكنه الوصول فقط إلى بياناته الخاصة، مع منح صلاحيات خاصة للمديرين لإدارة الإعدادات العالمية.
+
+---
+تم تطويره بواسطة [Abdo Amer](mailto:abdoamer067@gmail.com)
